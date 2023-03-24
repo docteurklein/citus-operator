@@ -1,0 +1,18 @@
+[package]
+name = "citus-operator"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+kube = { version = "0.80.0", features = ["runtime", "derive"] }
+k8s-openapi = { version = "0.17.0", features = ["v1_26"] }
+schemars = "0.8.12"
+serde = "1.0.158"
+serde_json = "1.0.94"
+tokio = { version = "1.26.0", features = ["full"] }
+anyhow = "1.0.70"
+serde_yaml = "0.9.19"
+thiserror = "1.0.40"
+futures-util = "0.3.27"
