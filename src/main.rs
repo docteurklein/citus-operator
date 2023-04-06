@@ -9,6 +9,9 @@ use k8s_openapi::{
     apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition,
     apimachinery::pkg::api::resource::Quantity,
 };
+
+mod cnpg;
+
 use kube::{
     Client,
     CustomResource,
@@ -26,26 +29,26 @@ use kube::{
 use serde_json::{Value, json};
 
 #[derive(CustomResource, Debug, Serialize, Deserialize, Default, Clone, JsonSchema)]
-#[kube(group = "citus.dev", version = "v1", kind = "Cluster", namespaced)]
+#[kube(group = "citus.dev", version = "v1", kind = "Cluster", struct = "CitusCluster", namespaced)]
 #[kube(scale = r#"{"specReplicasPath":".spec.replicas", "statusReplicasPath":".status.replicas"}"#)]
-#[kube(status = "ClusterStatus")]
-pub struct ClusterSpec {
+#[kube(status = "CitusClusterStatus")]
+pub struct CitusClusterSpec {
     nodes: isize,
-    node_spec: CnpgSpec,
+    node_spec: cnpg::ClusterSpec,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, Default, JsonSchema)]
-pub struct CnpgSpec {
-    instances: isize,
-    storage: Storage,
-}
+// #[derive(Deserialize, Serialize, Clone, Debug, Default, JsonSchema)]
+// pub struct CnpgSpec {
+//     instances: isize,
+//     storage: Storage,
+// }
 
+// #[derive(Deserialize, Serialize, Clone, Debug, Default, JsonSchema)]
+// pub struct Storage {
+//     size: String,
+// }
 #[derive(Deserialize, Serialize, Clone, Debug, Default, JsonSchema)]
-pub struct Storage {
-    size: String,
-}
-#[derive(Deserialize, Serialize, Clone, Debug, Default, JsonSchema)]
-pub struct ClusterStatus {
+pub struct CitusClusterStatus {
     is_ok: bool,
     nodes: isize,
 }
@@ -67,11 +70,11 @@ async fn main() -> anyhow::Result<()> {
 
     // install crd
     let crds_api: Api<CustomResourceDefinition> = Api::all(client.clone());
-    crds_api.patch("clusters.citus.dev", &apply, &Patch::Apply(Cluster::crd())).await?;
+    crds_api.patch("clusters.citus.dev", &apply, &Patch::Apply(CitusCluster::crd())).await?;
     let establish = await_condition(crds_api, "clusters.citus.dev", conditions::is_crd_established());
     let _ = tokio::time::timeout(std::time::Duration::from_secs(10), establish).await?;
 
-    let citus_api: Api<Cluster> = Api::all(client.clone());
+    let citus_api: Api<CitusCluster> = Api::all(client.clone());
 
     let gvk = GroupVersionKind::gvk("postgresql.cnpg.io", "v1", "Cluster");
     let ar = ApiResource::from_gvk(&gvk);
@@ -96,11 +99,11 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn error_policy(_object: Arc<Cluster>, _error: &kube::Error, _ctx: Arc<Data>) -> Action {
+fn error_policy(_object: Arc<CitusCluster>, _error: &kube::Error, _ctx: Arc<Data>) -> Action {
     Action::requeue(Duration::from_secs(1))
 }
 
-async fn reconcile(generator: Arc<Cluster>, ctx: Arc<Data>) -> Result<Action, kube::Error> {
+async fn reconcile(generator: Arc<CitusCluster>, ctx: Arc<Data>) -> Result<Action, kube::Error> {
     // setup cnpg api
     let gvk = GroupVersionKind::gvk("postgresql.cnpg.io", "v1", "Cluster");
     let ar = ApiResource::from_gvk(&gvk);
